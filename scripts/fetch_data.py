@@ -14,7 +14,7 @@ def fund(t):
         except Exception:
             pass
         time.sleep(0.2)
-        return {"eg": n(i.get("earningsGrowth")), "rg": n(i.get("revenueGrowth")), "roe": n(i.get("returnOnEquity")), "de": n(i.get("debtToEquity")), "pm": n(i.get("profitMargins")), "ed": ed}
+        return {"eg": n(i.get("earningsGrowth")), "rg": n(i.get("revenueGrowth")), "roe": n(i.get("returnOnEquity")), "de": n(i.get("debtToEquity")), "pm": n(i.get("profitMargins")), "sec": i.get("sector"), "ed": ed}
     except Exception:
         return None
 for name, (syms, sfx, ix) in LISTS.items():
@@ -26,7 +26,7 @@ for name, (syms, sfx, ix) in LISTS.items():
             d = df[t].dropna(subset=["Close", "High", "Low"])
             if len(d) < 70:
                 continue
-            out[s] = {"c": [round(float(x), 2) for x in d.Close], "h": [round(float(x), 2) for x in d.High], "l": [round(float(x), 2) for x in d.Low], "v": [int(x) for x in d.Volume.fillna(0)], "last": round(float(d.Close.iloc[-1]), 2), "f": fund(t)}
+            out[s] = {"c": [round(float(x), 2) for x in d.Close], "h": [round(float(x), 2) for x in d.High], "l": [round(float(x), 2) for x in d.Low], "v": [int(x) for x in d.Volume.fillna(0)], "last": round(float(d.Close.iloc[-1]), 2), "d": [str(x.date()) for x in d.index], "f": fund(t)}
         except Exception as e:
             print("skip", s, e)
     idx = [round(float(x), 2) for x in yf.Ticker(ix).history(period="1y")["Close"].dropna()]
