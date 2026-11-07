@@ -1,5 +1,6 @@
 {
- "saved": 1793961736588,
+ "saved": 1794019969705,
+ "by": "page",
  "pos": [
   {
    "id": 1793960000394,
@@ -157,5 +158,18 @@
     "Entered at 1,065.59"
    ]
   }
- ]
+ ],
+ "set": {
+  "capIND": 1000000,
+  "capUS": 10000,
+  "risk": 1,
+  "maxOpen": 5,
+  "minScore": 70,
+  "auto": 1,
+  "autoClose": 1,
+  "cost": 0.1,
+  "lock": 0.3,
+  "trail": 2
+ },
+ "del": []
 }
