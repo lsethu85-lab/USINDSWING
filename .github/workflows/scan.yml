@@ -1,0 +1,26 @@
+name: Scan and paper-trade
+on:
+  schedule:
+    - cron: '*/15 13-21 * * 1-5'   # US session (UTC)
+    - cron: '*/15 3-10 * * 1-5'    # India session (UTC)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: scan
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scan.mjs
+      - run: |
+          git config user.name "swing-bot"
+          git config user.email "swing-bot@users.noreply.github.com"
+          git add data/state.json
+          git diff --cached --quiet || (git commit -m "scan $(date -u +%FT%TZ)" && git pull --rebase -q && git push)
