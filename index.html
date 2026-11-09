@@ -165,14 +165,15 @@ return`<div class="f">${i('cap.us','US capital ($)',cfg.cap.us)}${i('cap.in','In
 <h3>Data &amp; GitHub</h3><div class="f">${i('proxy','Custom proxy (optional; built-in fallbacks run automatically)',cfg.proxy,'text')}${i('repo','GitHub repo',cfg.repo,'text')}${i('token','Fine-grained token (this browser only)',cfg.token,'password')}</div><p><button class="b p" id="sv">Save settings</button> <button class="b" id="push">Push trades to GitHub</button> <button class="b" id="pull">Pull trades from GitHub</button> <button class="b" id="rs">Reset paper account</button> <span id="sm" class="mu"></span></p>
 <p class="mu">Data: Yahoo Finance daily bars (about 15 minutes delayed), fetched automatically through built-in fallback routes; the app rescans every 15 minutes while the page is open and signals use completed daily bars only. A token typed here is stored in this browser; for a hardened setup move scanning and exits to a scheduled GitHub Action instead.</p>`}};
 function render(){$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k==tab?'on':''}" data-t="${k}">${l}</button>`).join('');$('#m').innerHTML=V[tab]();
-$('#st').textContent=S.meta.ts?'Last scan '+new Date(S.meta.ts).toLocaleString():'No scan yet';
+const ag=S.meta.ts?Math.round((Date.now()-S.meta.ts)/6e4):0,fa=ag>=90?(ag/60).toFixed(1)+' h':ag+' min';
+$('#st').innerHTML=S.meta.ts?`Scan ${new Date(S.meta.ts).toLocaleString()} (${fa} ago)<br><small>Page checked ${chk?new Date(chk).toLocaleTimeString():'–'}</small>`:'No scan yet';
 if(tab=='se'){const sm=t=>$('#sm').textContent=t;$('#sv').onclick=()=>{document.querySelectorAll('[data-k]').forEach(e=>{const p=e.dataset.k.split('.'),v=e.type=='number'?+e.value:e.value;p.length>1?cfg[p[0]][p[1]]=v:cfg[p[0]]=v});save();sm('Saved')};
 $('#rs').onclick=()=>{if(confirm('Delete all paper trades?')){S.trades=[];save();render()}};
 const api=()=>({u:`https://api.github.com/repos/${cfg.repo}/contents/paper-trades.json`,h:{Authorization:'Bearer '+cfg.token,Accept:'application/vnd.github+json'}});
 $('#push').onclick=async()=>{try{const{u,h}=api();let sha;const g=await fetch(u,{headers:h});if(g.ok)sha=(await g.json()).sha;
 const r=await fetch(u,{method:'PUT',headers:h,body:JSON.stringify({message:'Update paper trades',sha,content:btoa(unescape(encodeURIComponent(JSON.stringify(S.trades,null,1))))})});sm(r.ok?'Pushed':'Push failed '+r.status)}catch(e){sm('Push failed')}};
 $('#pull').onclick=async()=>{try{const{u,h}=api(),r=await fetch(u,{headers:h});if(!r.ok)return sm('Pull failed '+r.status);S.trades=JSON.parse(decodeURIComponent(escape(atob((await r.json()).content))));save();sm('Pulled '+S.trades.length+' trades')}catch(e){sm('Pull failed')}}}}
-$('#nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;render()}};async function loadState(){try{const r=await fetch('data/state.json?'+Date.now());if(!r.ok)return false;const j=await r.json();Object.assign(S,{picks:j.picks,rej:j.rej,reg:j.reg,meta:j.meta,trades:j.trades,last:j.last,fx:j.fx});save();render();return true}catch(e){return false}}
-const refresh=async()=>{if(!(await loadState()))scan()};
+$('#nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;render()}};let chk=0;async function loadState(){try{const r=await fetch('data/state.json?'+Date.now());if(!r.ok)return false;const j=await r.json();Object.assign(S,{picks:j.picks,rej:j.rej,reg:j.reg,meta:j.meta,trades:j.trades,last:j.last,fx:j.fx});save();chk=Date.now();render();return true}catch(e){return false}}
+const refresh=async()=>{const b=$('#scan');b.textContent='Checking…';if(await loadState())b.textContent='Refresh';else scan()};
 $('#scan').onclick=refresh;render();refresh();setInterval(refresh,3e5);
 </script></body></html>
