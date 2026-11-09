@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Institutional Swing Trading – US & India</title>
+<style>
+:root{--bg:#0d1117;--pn:#151b24;--ln:#253142;--tx:#d8e0ea;--mu:#8393a7;--up:#3fb68b;--dn:#e5636d;--ac:#e0b252}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ln)}
+h1{font-size:17px;margin:0;letter-spacing:.2px}small,.mu{color:var(--mu)}
+nav{display:flex;gap:2px;overflow-x:auto;padding:0 12px;border-bottom:1px solid var(--ln)}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mu);padding:10px 12px;cursor:pointer;font:inherit;white-space:nowrap}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+main{padding:16px;max-width:1300px;margin:auto}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.c{background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:12px}
+.c b.big{display:block;font-size:22px;margin-top:2px}
+.tw{overflow-x:auto;border:1px solid var(--ln);border-radius:6px;margin-bottom:16px}
+table{border-collapse:collapse;width:100%;min-width:760px}th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--ln);white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}th{color:var(--mu);font-weight:500;background:var(--pn)}
+.up{color:var(--up)}.dn{color:var(--dn)}.ac{color:var(--ac)}
+button.b,select,input,textarea{background:#1b2431;color:var(--tx);border:1px solid var(--ln);border-radius:5px;padding:7px 11px;font:inherit}
+button.b{cursor:pointer}button.b.p{background:var(--ac);color:#1a1405;border-color:var(--ac);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac)}
+.tag{padding:1px 7px;border-radius:9px;font-size:12px;border:1px solid var(--ln)}
+.warn{background:#2a2110;border:1px solid #5b4719;color:#f0d9a0;padding:10px 12px;border-radius:6px;margin-bottom:14px}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:flex;flex-direction:column;gap:3px;color:var(--mu);font-size:12px}
+details{margin-bottom:14px}summary{cursor:pointer;color:var(--mu)}ul.w{margin:4px 0 0;padding-left:18px;color:var(--mu)}
+footer{padding:20px;text-align:center;color:var(--mu);font-size:12px}
+@media(prefers-reduced-motion:no-preference){.sp{animation:s 1s linear infinite;display:inline-block}@keyframes s{to{transform:rotate(360deg)}}}
+</style></head><body>
+<header><div><h1>Institutional Swing Trading</h1><small>US &amp; India · paper trading only · 5–14 day holds</small></div>
+<div><span id="st" class="mu"></span> <button class="b p" id="scan">Refresh</button></div></header>
+<nav id="nav"></nav><main id="m"></main>
+<footer>⚡ Powered by Sethu · Research &amp; paper trading only. Not financial advice. Paper results are not achievable real-world returns.</footer>
+<script>
+const $=s=>document.querySelector(s),K='swing_v1';
+const DEF={cap:{us:50000,in:2000000},risk:.75,maxPos:6,maxRisk:4,minRR:2,minScore:78,noFundMin:82,maxHold:14,dayLoss:2,weekLoss:4,maxDD:10,
+slip:{us:.001,in:.0015},proxy:'',repo:'lsethu85-lab/USINDSWING',token:'',
+uni:{us:'AAPL,MSFT,NVDA,AMZN,GOOGL,META,AVGO,LLY,JPM,V,COST,NFLX,AMD,CRM,ORCL,ADBE,UBER,PANW,NOW,CAT,GE,UNH,HD,XOM,BAC',
+in:'RELIANCE,TCS,HDFCBANK,ICICIBANK,INFY,BHARTIARTL,LT,SBIN,ITC,AXISBANK,M&M,SUNPHARMA,TITAN,BAJFINANCE,MARUTI,HCLTECH,NTPC,TATAMOTORS,ADANIPORTS,POWERGRID,TRENT,HAL,BEL,COALINDIA,DRREDDY'},
+w:{regime:10,trend:15,pa:15,mom:10,vol:10,fund:20,rs:10,rr:10}};
+let S=JSON.parse(localStorage.getItem(K)||'null')||{cfg:DEF,trades:[],picks:{us:[],in:[]},rej:{us:[],in:[]},reg:{},meta:{}};
+S.cfg={...DEF,...S.cfg};const cfg=S.cfg,save=()=>localStorage.setItem(K,JSON.stringify(S));
+let tab='ov',BARS={};const f2=(x,d=2)=>x==null||isNaN(x)?'–':Number(x).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const cur=m=>m=='us'?'$':'₹',cl=x=>x>0?'up':x<0?'dn':'';
+/* ---------- data ---------- */
+const BM={us:['^GSPC','^IXIC'],in:['^NSEI','^NSEBANK']};
+const PX=[x=>'https://corsproxy.io/?'+encodeURIComponent(x),x=>'https://api.allorigins.win/raw?url='+encodeURIComponent(x),x=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(x)];
+let good=null;
+async function getJ(u){const mk=[...(cfg.proxy?[x=>cfg.proxy+encodeURIComponent(x)]:[]),x=>x,...PX],all=[...mk.keys()],order=good==null?all:[good,...all.filter(i=>i!=good)];let last=Error('no route');
+for(const i of order)for(const h of['query1','query2']){try{const r=await fetch(mk[i](u.replace('query1',h)),{signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error(r.status);const j=await r.json();if(j.chart&&j.chart.result){good=i;return j}throw Error('bad response')}catch(e){last=e}}throw last}
+const ghA=()=>({u:`https://api.github.com/repos/${cfg.repo}/contents/paper-trades.json`,h:{Authorization:'Bearer '+cfg.token,Accept:'application/vnd.github+json'}});
+async function ghPush(){if(!cfg.token)return;try{const{u,h}=ghA();let sha;const g=await fetch(u,{headers:h});if(g.ok)sha=(await g.json()).sha;await fetch(u,{method:'PUT',headers:h,body:JSON.stringify({message:'Auto-sync paper trades',sha,content:btoa(unescape(encodeURIComponent(JSON.stringify(S.trades))))})})}catch(e){}}
+async function ghPull(){if(!cfg.token||S.trades.length)return;try{const{u,h}=ghA(),r=await fetch(u,{headers:h});if(r.ok){S.trades=JSON.parse(decodeURIComponent(escape(atob((await r.json()).content))));save()}}catch(e){}}
+async function bars(sym){const u=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`;
+const j=await getJ(u),x=j.chart.result[0],q=x.indicators.quote[0],o={t:[],o:[],h:[],l:[],c:[],v:[]};
+x.timestamp.forEach((t,i)=>{if(q.close[i]==null||q.open[i]==null)return;o.t.push(t*1e3);o.o.push(q.open[i]);o.h.push(q.high[i]);o.l.push(q.low[i]);o.c.push(q.close[i]);o.v.push(q.volume[i]||0)});
+if(sessOpen(sym.includes('.NS')||sym[0]=='^'&&['^NSEI','^NSEBANK'].includes(sym)?'in':'us')&&o.t.length)for(const k in o)o[k].pop();return o}
+function sessOpen(m){const tz=m=='us'?'America/New_York':'Asia/Kolkata',p=new Intl.DateTimeFormat('en-US',{timeZone:tz,weekday:'short',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(new Date()),g=t=>p.find(x=>x.type==t).value,mi=(+g('hour')%24)*60+ +g('minute'),[o,c]=m=='us'?[570,960]:[555,930];return!['Sat','Sun'].includes(g('weekday'))&&mi>=o&&mi<c}
+const ysym=(s,m)=>m=='in'?s+'.NS':s;
+/* ---------- indicators ---------- */
+const ema=(a,n)=>{const k=2/(n+1);let e=a[0];return a.map((x,i)=>i?(e=x*k+e*(1-k)):e)};
+const sma=(a,n)=>a.slice(-n).reduce((x,y)=>x+y,0)/Math.min(n,a.length);
+const rsi=(c,n=14)=>{let g=0,l=0;for(let i=1;i<=n;i++){const d=c[i]-c[i-1];d>0?g+=d:l-=d}g/=n;l/=n;for(let i=n+1;i<c.length;i++){const d=c[i]-c[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n}return l?100-100/(1+g/l):100};
+const tr=(b,i)=>Math.max(b.h[i]-b.l[i],Math.abs(b.h[i]-b.c[i-1]),Math.abs(b.l[i]-b.c[i-1]));
+const atr=(b,n=14)=>{let a=0;for(let i=1;i<=n;i++)a+=tr(b,i);a/=n;for(let i=n+1;i<b.c.length;i++)a=(a*(n-1)+tr(b,i))/n;return a};
+const g01=x=>Math.max(0,Math.min(1,x));
+function regimeOf(b){const c=b.c,n=c.length,e50=ema(c,50)[n-1],e200=ema(c,200)[n-1],l=c[n-1];return{l,e50,e200,r:l>e50&&e50>e200?'bull':l<e50&&e50<e200?'bear':'sideways',chg5:(l/c[n-6]-1)*100}}
+/* ---------- analysis ---------- */
+function analyze(sym,b,m,rg,bm){const n=b.c.length,rej=w=>({sym,m,ok:false,why:w});if(n<210)return rej('Fewer than 210 daily bars');
+const c=b.c,l=c[n-1],E20=ema(c,20)[n-1],E50=ema(c,50)[n-1],E2=ema(c,200),E200=E2[n-1],A=atr(b),R=rsi(c),adv=sma(b.v.map((v,i)=>v*c[i]),20);
+if(adv<(m=='us'?2e7:1e8))return rej('Illiquid (avg traded value too low)');if(A/l>.07)return rej('Too volatile (ATR above 7% of price)');
+const H=(a,x,y)=>Math.max(...a.h.slice(x,y)),L=(a,x,y)=>Math.min(...a.l.slice(x,y)),hi20=H(b,n-21,n-1),lo20=L(b,n-21,n-1),hi60=H(b,n-61,n-1),lo60=L(b,n-61,n-1),rv=b.v[n-1]/sma(b.v.slice(n-21,n-1),20);
+const up=l>E50&&E50>E200&&E20>E50,dn=l<E50&&E50<E200&&E20<E50,reg=rg.r;let s=null;
+if(reg=='bull'&&up){if(l>hi20&&rv>=1.3&&l<hi20*1.04)s={st:'Breakout',d:1};else if(Math.abs(l-E20)<.6*A&&R>38&&R<55)s={st:'Pullback',d:1}}
+else if(reg=='bear'&&dn){if(l<lo20&&rv>=1.3&&l>lo20*.96)s={st:'Breakdown',d:-1}}
+else if(reg=='sideways'){if(R<35&&l<=lo20*1.02&&l>E200*.9)s={st:'Range support bounce',d:1};else if(R>65&&l>=hi20*.98&&l<E200*1.15)s={st:'Range resistance rejection',d:-1}}
+if(!s)return rej(`No valid ${reg}-regime setup (trend/volume/RSI conditions not met)`);
+const d=s.d,rng=/Range/.test(s.st),entry=l*(1+d*cfg.slip[m]),stop=entry-d*(rng?1.2:1.5)*A,Rk=Math.abs(entry-stop),t1=entry+d*2*Rk,t2=entry+d*3*Rk,t3=entry+d*4.5*Rk,room=d>0?(hi60-entry)/Rk:(entry-lo60)/Rk;
+if(!/Break/.test(s.st)&&room<cfg.minRR)return rej(`Only ${f2(room,1)}R of room to nearest ${d>0?'resistance':'support'}`);
+const e12=ema(c,12),e26=ema(c,26),mc=e12.map((x,i)=>x-e26[i]),sg=ema(mc,9),h=mc[n-1]-sg[n-1],hp=mc[n-2]-sg[n-2];
+let o=0;const ob=c.map((x,i)=>i?(o+=Math.sign(x-c[i-1])*b.v[i]):0),w=c.filter((_,i)=>(n-1-i)%5==0),wUp=w[w.length-1]>ema(w,10)[w.length-1],
+rs=(l/c[n-64])/(bm[bm.length-1]/bm[bm.length-64])-1,cp=(l-b.l[n-1])/(b.h[n-1]-b.l[n-1]+1e-9),dir=d>0?cp:1-cp;
+const sc={regime:reg=='sideways'?.7:Math.abs(rg.l/rg.e50-1)>.02?1:.75,
+trend:rng?.6:d>0?(E20>E50)*.25+(E50>E200)*.25+(wUp?.35:0)+(E2[n-1]>E2[n-21]?.15:0):(E20<E50)*.25+(E50<E200)*.25+(!wUp?.35:0)+(E2[n-1]<E2[n-21]?.15:0),
+pa:g01(.5*dir+.5*g01(1-Math.abs(l-(s.st=='Pullback'?E20:rng?(d>0?lo20:hi20):d>0?hi20:lo20))/(1.5*A))),
+mom:rng?(d*(h-hp)>0?.6:.2)+((d>0?R<30:R>70)?.4:0):d>0?g01((R-40)/30)*.5+(h>0?.25:0)+(h>hp?.25:0):g01((60-R)/30)*.5+(h<0?.25:0)+(h<hp?.25:0),
+vol:g01(rv/1.8)*.6+(d*(ob[n-1]-ob[n-21])>0?.4:0),rs:g01(.5+d*rs*2.5),rr:g01(room/5)*.6+g01(adv/(m=='us'?2e8:1e9))*.4,fund:null};
+let tw=0,ts=0;for(const k in sc)if(sc[k]!=null){tw+=cfg.w[k];ts+=cfg.w[k]*sc[k]}const score=ts/tw*100,gr=score>=90?'A+':score>=85?'A':score>=78?'B+':score>=70?'B':'';
+if(!gr)return rej(`Score ${f2(score,0)} below 70`);
+const tradable=!(m=='in'&&d<0),q=(gr=='B'||score<cfg.noFundMin)?'Watch':'Qualified';
+const why=[`Market regime: ${reg} (${m=='us'?'S&P 500':'NIFTY 50'} ${reg=='bull'?'above rising 50/200 EMA':reg=='bear'?'below 50/200 EMA':'mixed vs 50/200 EMA'})`,
+`Weekly trend: ${wUp?'above':'below'} 10-week EMA; daily EMA 20/50/200 ${up?'stacked up':dn?'stacked down':'mixed'}`,`Momentum: RSI ${f2(R,0)}, MACD histogram ${h>hp?'rising':'falling'}`,
+`Volume: ${f2(rv,1)}× 20-day average; OBV ${ob[n-1]>ob[n-21]?'rising':'falling'}`,`Relative strength (3m vs index): ${f2(rs*100,1)}%`,`Stop: ${rng?1.2:1.5}×ATR(14) = ${f2(A)}; room to ${d>0?'resistance':'support'}: ${f2(room,1)}R`];
+const risks=['Fundamentals not connected: price-only score','Earnings date not checked: verify before trading'];if(!tradable)risks.unshift('India cash shorts cannot be held overnight: use futures/puts manually');
+if(d<0&&m=='us')risks.unshift('Short: check borrow availability and fees');
+return{sym,m,ok:true,d,st:s.st,reg,entry,stop,t1,t2,t3,rr:2,score,gr,sc,tradable,status:tradable?q:'Watch (no cash short)',A,sigT:b.t[n-1],why,risks,adv}}
+/* ---------- scan ---------- */
+async function pool(items,fn,n=4){let i=0;await Promise.all(Array(n).fill(0).map(async()=>{while(i<items.length){const x=items[i++];await fn(x)}}))}
+async function scan(){const btn=$('#scan');btn.disabled=true;btn.innerHTML='<span class="sp">⟳</span> Scanning';let err=0;
+try{try{BARS.fx=await bars('USDINR=X')}catch(e){}
+for(const m of['us','in']){S.picks[m]=[];S.rej[m]=[];let bb={};
+for(const s of BM[m]){try{bb[s]=await bars(s)}catch(e){err++}}
+const b0=bb[BM[m][0]];if(!b0||b0.c.length<210){S.reg[m]={err:'Benchmark data unavailable: no new trades for this market'};continue}
+const rg=regimeOf(b0);rg.idx=BM[m].map(s=>bb[s]?{s,chg:(bb[s].c.at(-1)/bb[s].c.at(-6)-1)*100,up:bb[s].c.at(-1)>ema(bb[s].c,50).at(-1)}:null);let above=0,tot=0;
+await pool(cfg.uni[m].split(',').map(x=>x.trim()).filter(Boolean),async s=>{try{const b=await bars(ysym(s,m));BARS[m+s]=b;if(b.c.length>=210){tot++;if(b.c.at(-1)>ema(b.c,50).at(-1))above++}
+const r=analyze(s,b,m,rg,b0.c);(r.ok?S.picks[m]:S.rej[m]).push(r)}catch(e){err++;S.rej[m].push({sym:s,m,why:'Data fetch failed ('+e.message+')'})}});
+rg.breadth=tot?above/tot*100:null;rg.vol=atr(b0)/b0.c.at(-1)*100;S.reg[m]=rg;S.picks[m].sort((a,b)=>b.score-a.score);
+const px=S.picks[m].filter(p=>p.status=='Qualified');for(const p of px)enter(p)}
+await monitor()}finally{S.meta={ts:Date.now(),err};save();ghPush();btn.disabled=false;btn.textContent='Refresh';render()}}
+/* ---------- paper engine ---------- */
+const open=m=>S.trades.filter(t=>t.m==m&&t.status!='closed'&&t.status!='cancelled');
+const rd=t=>t.qty0*Math.abs(t.entry0-t.stop0);
+function guard(m){const tr=S.trades.filter(t=>t.m==m),cap=cfg.cap[m],now=Date.now(),pl=ms=>tr.reduce((a,t)=>a+t.exits.filter(e=>now-e.t<ms).reduce((x,e)=>x+e.pnl,0),0);
+if(pl(864e5)<-cap*cfg.dayLoss/100)return'Daily loss limit hit';if(pl(6048e5)<-cap*cfg.weekLoss/100)return'Weekly loss limit hit';const e=equity(m);if(e.dd>cfg.maxDD)return'Max drawdown breached';
+if(open(m).length>=cfg.maxPos)return'Max open positions';if(open(m).reduce((a,t)=>a+rd(t),0)/cap*100>=cfg.maxRisk)return'Portfolio risk cap reached';return''}
+function enter(p){const m=p.m;if(open(m).some(t=>t.sym==p.sym)||S.trades.some(t=>t.sym==p.sym&&t.m==m&&t.sigT==p.sigT))return;if(guard(m))return;
+const cap=cfg.cap[m],Rk=Math.abs(p.entry-p.stop);let q=Math.floor(cap*cfg.risk/100/Rk);q=Math.min(q,Math.floor(cap*.25/p.entry));if(q<1)return;
+S.trades.push({id:Date.now()+p.sym,sym:p.sym,m,d:p.d,reg:p.reg,st:p.st,entry:p.entry,entry0:p.entry,stop:p.stop,stop0:p.stop,t1:p.t1,t2:p.t2,t3:p.t3,qty:q,qty0:q,atr:p.A,score:p.score,gr:p.gr,why:p.why,
+status:'pending',sigT:p.sigT,sigAt:Date.now(),lastBar:p.sigT,exits:[],hit:0,cost:0})}
+function cost(t,px,q,sell){let c=px*q*(t.m=='us'?.0005:.0006);if(t.m=='in'&&sell)c+=px*q*.001;return c}
+function exit(t,q,px,why,ts){q=Math.min(q,t.qty);const pnl=t.d*(px-t.entry)*q-cost(t,px,q,t.d>0)-cost(t,t.entry,q,t.d<0)-(t.m=='us'&&t.d<0?t.entry*q*.005*Math.max(1,(ts-t.openT)/864e5)/365:0);
+t.exits.push({t:ts,px,q,why,pnl});t.qty-=q;if(t.qty<=0){t.status='closed';t.closeT=ts}}
+async function monitor(){for(const t of S.trades){if(t.status=='closed'||t.status=='cancelled')continue;let b=BARS[t.m+t.sym];if(!b){try{b=BARS[t.m+t.sym]=await bars(ysym(t.sym,t.m))}catch(e){continue}}
+const d=t.d;for(let i=0;i<b.t.length;i++){if(b.t[i]<=t.lastBar)continue;const o=b.o[i],h=b.h[i],l=b.l[i],c=b.c[i];
+if(t.status=='pending'){const fill=o*(1+d*cfg.slip[t.m]);if(Math.abs(fill-t.entry0)>t.atr||(d>0?fill<=t.stop:fill>=t.stop)){t.status='cancelled';t.note='Cancelled: gap invalidated setup';break}
+t.entry=fill;t.openT=b.t[i];t.status='open'}
+const hs=d>0?l<=t.stop:h>=t.stop;if(hs){exit(t,t.qty,d>0?Math.min(o,t.stop):Math.max(o,t.stop),t.hit?'Trailing/BE stop':'Stop-loss',b.t[i]);t.lastBar=b.t[i];break}
+for(const[k,fr]of[[1,.4],[2,.3],[3,1]]){const tg=t['t'+k];if(t.hit<k&&(d>0?h>=tg:l<=tg)){exit(t,k==3?t.qty:Math.round(t.qty0*fr),d>0?Math.max(o,tg):Math.min(o,tg),'Target '+k,b.t[i]);t.hit=k;t.stop=k==1?t.entry:t.t1}}
+if(t.status=='open'&&t.hit){const tr=c-d*1.5*t.atr;t.stop=d>0?Math.max(t.stop,tr):Math.min(t.stop,tr)}
+t.lastBar=b.t[i];if(t.status=='open'&&(b.t[i]-t.openT)/864e5>=cfg.maxHold){exit(t,t.qty,c,'Max holding period',b.t[i])}if(t.status=='closed')break}}}
+function equity(m){const cap=cfg.cap[m],tr=S.trades.filter(t=>t.m==m);let rl=0,un=0,pk=cap,dd=0,eq=cap;const ev=tr.flatMap(t=>t.exits).sort((a,b)=>a.t-b.t);ev.forEach(e=>{rl+=e.pnl;eq=cap+rl;pk=Math.max(pk,eq);dd=Math.max(dd,(pk-eq)/pk*100)});
+tr.filter(t=>t.status=='open').forEach(t=>{const b=BARS[m+t.sym];const px=b?b.c.at(-1):S.last&&S.last[m+t.sym];if(px)un+=t.d*(px-t.entry)*t.qty});return{cap,rl,un,eq:cap+rl+un,dd,curve:[cap,...ev.reduce((a,e)=>(a.push((a.at(-1)||cap)+e.pnl),a),[])]}}
+/* ---------- views ---------- */
+const TABS=[['ov','Market overview'],['us','US picks'],['in','India picks'],['pt','Paper trading'],['an','Analytics'],['rk','Risk'],['se','Settings']];
+function pickTable(m){const P=S.picks[m],R=S.rej[m],r=S.reg[m];if(r&&r.err)return`<div class="warn">${r.err}</div>`;
+const rows=P.map((p,i)=>`<tr><td>${i+1}</td><td class="l"><b>${p.sym}</b></td><td class="${p.d>0?'up':'dn'}">${p.d>0?'Long':'Short'}</td><td>${p.reg}</td><td class="l">${p.st}</td><td>${f2(p.entry)}</td><td>${f2(p.stop)}</td><td>${f2(p.t1)}</td><td>${f2(p.t2)}</td><td>${f2(p.t3)}</td><td>${f2(p.score,0)}</td><td class="ac">${p.gr}</td><td class="l">${p.status}</td></tr><tr><td colspan="13" class="l"><details><summary>Why this pick</summary><ul class="w">${p.why.map(x=>`<li>${x}</li>`).join('')}</ul><div class="ac">Risks:</div><ul class="w">${p.risks.map(x=>`<li>${x}</li>`).join('')}</ul></details></td></tr>`).join('');
+return(P.length?`<div class="tw"><table><tr><th>#</th><th class="l">Symbol</th><th>Side</th><th>Regime</th><th class="l">Strategy</th><th>Entry</th><th>Stop</th><th>T1</th><th>T2</th><th>T3</th><th>Score</th><th>Grade</th><th class="l">Status</th></tr>${rows}</table></div>`:`<div class="c"><b>${S.meta.ts?'NO QUALIFIED TRADES':'Run a scan to begin'}</b><div class="mu">Signals are never manufactured to fill the list.</div></div><br>`)+
+`<details><summary>Rejected (${R.length}) with reasons</summary><div class="tw"><table><tr><th class="l">Symbol</th><th class="l">Reason</th></tr>${R.map(x=>`<tr><td>${x.sym}</td><td class="l">${x.why}</td></tr>`).join('')}</table></div></details>`}
+function tradeRows(L){return L.map(t=>{const pn=t.exits.reduce((a,e)=>a+e.pnl,0),R=pn/rd(t);return`<tr><td class="l"><b>${t.sym}</b> <small>${t.m=='us'?'US':'IN'}</small></td><td class="${t.d>0?'up':'dn'}">${t.d>0?'Long':'Short'}</td><td class="l">${t.st}</td><td>${t.status}</td><td>${f2(t.entry)}</td><td>${f2(t.stop)}</td><td>${f2(t.t1)}/${f2(t.t2)}/${f2(t.t3)}</td><td>${t.qty}/${t.qty0}</td><td class="${cl(pn)}">${f2(pn)}</td><td class="${cl(R)}">${f2(R)}R</td><td class="l">${t.exits.map(e=>e.why).join(', ')||t.note||''}</td></tr>`}).join('')}
+function stats(L){const C=L.filter(t=>t.status=='closed'),p=C.map(t=>t.exits.reduce((a,e)=>a+e.pnl,0)),w=p.filter(x=>x>0),l=p.filter(x=>x<=0),gp=w.reduce((a,b)=>a+b,0),gl=-l.reduce((a,b)=>a+b,0);let cw=0,cL=0,a=0,b=0;p.forEach(x=>{x>0?(a++,b=0):(b++,a=0);cw=Math.max(cw,a);cL=Math.max(cL,b)});
+return{n:C.length,w:w.length,l:l.length,wr:C.length?w.length/C.length*100:null,net:p.reduce((a,b)=>a+b,0),pf:gl?gp/gl:null,avg:C.length?p.reduce((a,b)=>a+b,0)/C.length:null,R:C.length?C.reduce((a,t,i)=>a+p[i]/rd(t),0)/C.length:null,cw,cL,hold:C.length?C.reduce((a,t)=>a+(t.closeT-t.openT)/864e5,0)/C.length:null}}
+const grp=(L,k)=>[...new Set(L.map(t=>t[k]))].map(v=>{const s=stats(L.filter(t=>t[k]==v));return`<tr><td class="l">${v}</td><td>${s.n}</td><td>${f2(s.wr,0)}%</td><td>${f2(s.pf)}</td><td class="${cl(s.net)}">${f2(s.net)}</td></tr>`}).join('');
+function curve(v){if(v.length<2)return'<div class="mu">Equity curve appears after the first closed exit.</div>';const mn=Math.min(...v),mx=Math.max(...v),pts=v.map((y,i)=>`${i/(v.length-1)*600},${70-(y-mn)/(mx-mn||1)*64}`).join(' ');return`<svg viewBox="0 0 600 76" width="100%" height="90"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${pts}"/></svg>`}
+const V={
+ov(){const c=m=>{const r=S.reg[m];if(!r||!r.l)return`<div class="c"><b>${m=='us'?'US':'India'}</b><div class="mu">${r&&r.err||'No data yet. Run a scan.'}</div></div>`;
+return`<div class="c"><span class="mu">${m=='us'?'US market':'Indian market'} · ${sessOpen(m)?'session open':'closed'}</span><b class="big ${r.r=='bull'?'up':r.r=='bear'?'dn':'ac'}">${r.r}</b><div>${r.idx.filter(Boolean).map(i=>`${i.s.replace('^','')}: ${i.up?'above':'below'} 50 EMA, ${f2(i.chg,1)}% (5d)`).join('<br>')}</div><div class="mu">Universe above 50 EMA: ${f2(r.breadth,0)}% · ATR/price: ${f2(r.vol,1)}%</div></div>`};
+const eu=equity('us'),ei=equity('in'),fx=BARS.fx?BARS.fx.c.at(-1):S.fx,qa=[...S.picks.us,...S.picks.in].filter(p=>p.status=='Qualified').length;
+return(S.meta.err?`<div class="warn">${S.meta.err} data requests failed. The direct route and all built-in proxy fallbacks failed. Check your connection, wait a minute and scan again, or add your own proxy in Settings.</div>`:'')+`<div class="g">${c('us')}${c('in')}</div><div class="g">
+<div class="c"><span class="mu">Qualified picks</span><b class="big">${qa}</b></div><div class="c"><span class="mu">Open paper trades</span><b class="big">${open('us').length+open('in').length}</b></div>
+<div class="c"><span class="mu">US P&amp;L</span><b class="big ${cl(eu.eq-eu.cap)}">$${f2(eu.eq-eu.cap)}</b></div><div class="c"><span class="mu">India P&amp;L</span><b class="big ${cl(ei.eq-ei.cap)}">₹${f2(ei.eq-ei.cap)}</b></div>
+<div class="c"><span class="mu">Combined (USD)</span><b class="big">${fx?'$'+f2(eu.eq-eu.cap+(ei.eq-ei.cap)/fx):'FX unavailable'}</b></div></div>`},
+us:()=>pickTable('us'),in:()=>pickTable('in'),
+pt(){const o=S.trades.filter(t=>t.status=='open'||t.status=='pending'),c=S.trades.filter(t=>t.status=='closed'||t.status=='cancelled'),h='<tr><th class="l">Symbol</th><th>Side</th><th class="l">Strategy</th><th>Status</th><th>Entry</th><th>Stop</th><th>T1/T2/T3</th><th>Qty left</th><th>P&amp;L (booked)</th><th>R</th><th class="l">Exits</th></tr>';
+return`<h3>Open &amp; pending</h3><div class="tw"><table>${h}${tradeRows(o)||'<tr><td colspan="11" class="l mu">None</td></tr>'}</table></div><h3>Closed</h3><div class="tw"><table>${h}${tradeRows(c)||'<tr><td colspan="11" class="l mu">None</td></tr>'}</table></div>
+<p class="mu">Pending orders fill at the next session's open (with slippage) or cancel if a gap invalidates the setup. Stops are checked before targets within a bar (conservative). Brokerage, India STT and US borrow cost are modelled.</p>`},
+an(){const h=m=>{const L=S.trades.filter(t=>m=='all'||t.m==m),s=stats(L),e=m=='all'?null:equity(m);return`<div class="c"><b>${{us:'US',in:'India',all:'All trades'}[m]}</b><div>Closed: ${s.n} (W ${s.w} / L ${s.l}) · Win rate ${f2(s.wr,0)}%</div><div>Net ${f2(s.net)} · Profit factor ${f2(s.pf)} · Avg R ${f2(s.R)}</div><div>Max wins ${s.cw} · Max losses ${s.cL} · Avg hold ${f2(s.hold,1)}d${e?` · Max DD ${f2(e.dd,1)}%`:''}</div>${e?curve(e.curve):''}</div>`};
+const L=S.trades.filter(t=>t.status=='closed'),th='<tr><th class="l">Group</th><th>Trades</th><th>Win%</th><th>PF</th><th>Net</th></tr>';
+return`<div class="g">${h('us')}${h('in')}</div><div class="g"><div><h3>By strategy</h3><div class="tw"><table>${th}${grp(L,'st')}</table></div></div><div><h3>By market regime</h3><div class="tw"><table>${th}${grp(L,'reg')}</table></div></div></div>
+<div class="warn">Paper results only. Small samples mean nothing: wait for 30+ closed trades per strategy. No historical backtester is built in yet; weights and rules are untested starting values.</div>`},
+rk(){const r=m=>{const o=open(m),rk=o.reduce((a,t)=>a+rd(t),0)/cfg.cap[m]*100,g=guard(m);return`<div class="c"><b>${m=='us'?'US':'India'}</b><div>Open positions ${o.length}/${cfg.maxPos}</div><div>Open risk ${f2(rk,2)}% of ${f2(cfg.maxRisk,1)}% cap</div><div>Drawdown ${f2(equity(m).dd,1)}% (limit ${cfg.maxDD}%)</div><div class="${g?'dn':'up'}">${g?'New entries paused: '+g:'New entries allowed'}</div></div>`};
+return`<div class="g">${r('us')}${r('in')}</div><div class="c"><b>Not yet enforced</b><ul class="w"><li>Sector and correlation limits (no sector data source connected)</li><li>Earnings and economic-event blackouts (no verified calendar connected)</li><li>Fundamental scoring: weight is re-normalised, and entries need score ≥ ${cfg.noFundMin}</li><li>Market holidays (only weekdays and session hours are checked)</li></ul></div>`},
+se(){const i=(k,l,v,t='number')=>`<label>${l}<input data-k="${k}" type="${t}" step="any" value="${v}"></label>`;
+return`<div class="f">${i('cap.us','US capital ($)',cfg.cap.us)}${i('cap.in','India capital (₹)',cfg.cap.in)}${i('risk','Risk per trade (%)',cfg.risk)}${i('maxPos','Max open positions / market',cfg.maxPos)}${i('maxRisk','Max portfolio risk (%)',cfg.maxRisk)}${i('minRR','Min reward/risk room',cfg.minRR)}${i('noFundMin','Min score without fundamentals',cfg.noFundMin)}${i('maxHold','Max hold (days)',cfg.maxHold)}${i('dayLoss','Daily loss limit (%)',cfg.dayLoss)}${i('weekLoss','Weekly loss limit (%)',cfg.weekLoss)}${i('maxDD','Max drawdown (%)',cfg.maxDD)}</div><h3>Score weights</h3><div class="f">${Object.keys(cfg.w).map(k=>i('w.'+k,k,cfg.w[k])).join('')}</div>
+<h3>Universes (comma-separated; India without .NS)</h3><div class="f"><label>US<textarea data-k="uni.us" rows="4">${cfg.uni.us}</textarea></label><label>India<textarea data-k="uni.in" rows="4">${cfg.uni.in}</textarea></label></div>
+<h3>Data &amp; GitHub</h3><div class="f">${i('proxy','Custom proxy (optional; built-in fallbacks run automatically)',cfg.proxy,'text')}${i('repo','GitHub repo',cfg.repo,'text')}${i('token','Fine-grained token (this browser only)',cfg.token,'password')}</div><p><button class="b p" id="sv">Save settings</button> <button class="b" id="push">Push trades to GitHub</button> <button class="b" id="pull">Pull trades from GitHub</button> <button class="b" id="rs">Reset paper account</button> <span id="sm" class="mu"></span></p>
+<p class="mu">Data: Yahoo Finance daily bars (about 15 minutes delayed), fetched automatically through built-in fallback routes; the app rescans every 15 minutes while the page is open and signals use completed daily bars only. A token typed here is stored in this browser; for a hardened setup move scanning and exits to a scheduled GitHub Action instead.</p>`}};
+function render(){$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k==tab?'on':''}" data-t="${k}">${l}</button>`).join('');$('#m').innerHTML=V[tab]();
+$('#st').textContent=S.meta.ts?'Last scan '+new Date(S.meta.ts).toLocaleString():'No scan yet';
+if(tab=='se'){const sm=t=>$('#sm').textContent=t;$('#sv').onclick=()=>{document.querySelectorAll('[data-k]').forEach(e=>{const p=e.dataset.k.split('.'),v=e.type=='number'?+e.value:e.value;p.length>1?cfg[p[0]][p[1]]=v:cfg[p[0]]=v});save();sm('Saved')};
+$('#rs').onclick=()=>{if(confirm('Delete all paper trades?')){S.trades=[];save();render()}};
+const api=()=>({u:`https://api.github.com/repos/${cfg.repo}/contents/paper-trades.json`,h:{Authorization:'Bearer '+cfg.token,Accept:'application/vnd.github+json'}});
+$('#push').onclick=async()=>{try{const{u,h}=api();let sha;const g=await fetch(u,{headers:h});if(g.ok)sha=(await g.json()).sha;
+const r=await fetch(u,{method:'PUT',headers:h,body:JSON.stringify({message:'Update paper trades',sha,content:btoa(unescape(encodeURIComponent(JSON.stringify(S.trades,null,1))))})});sm(r.ok?'Pushed':'Push failed '+r.status)}catch(e){sm('Push failed')}};
+$('#pull').onclick=async()=>{try{const{u,h}=api(),r=await fetch(u,{headers:h});if(!r.ok)return sm('Pull failed '+r.status);S.trades=JSON.parse(decodeURIComponent(escape(atob((await r.json()).content))));save();sm('Pulled '+S.trades.length+' trades')}catch(e){sm('Pull failed')}}}}
+$('#nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;render()}};async function loadState(){try{const r=await fetch('data/state.json?'+Date.now());if(!r.ok)return false;const j=await r.json();Object.assign(S,{picks:j.picks,rej:j.rej,reg:j.reg,meta:j.meta,trades:j.trades,last:j.last,fx:j.fx});save();render();return true}catch(e){return false}}
+const refresh=async()=>{if(!(await loadState()))scan()};
+$('#scan').onclick=refresh;render();refresh();setInterval(refresh,3e5);
+</script></body></html>
